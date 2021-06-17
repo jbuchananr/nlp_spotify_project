@@ -16,7 +16,15 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.chrome.options import Options
 from webdriver_manager.chrome import ChromeDriverManager
+from sumy.parsers.plaintext import PlaintextParser
+from sumy.nlp.tokenizers import Tokenizer
+from sumy.summarizers.lex_rank import LexRankSummarizer
 from secret import *
+from sumy.summarizers.luhn import LuhnSummarizer
+import collections
+import spacy
+import nltk
+#nltk.download('punkt')
 
 def timer(x):
     while x > 0:
@@ -41,16 +49,49 @@ def main():
     #artist = genius.search_artist(song_artist, max_songs=1, sort="title")
     song = genius.search_song(song_name, song_artist)
     pattern = r'\[.*?\]'
-    lyrics = re.sub(pattern, '', song.lyrics)
-    print(lyrics)
-    print(song_length)
+    pattern2= r'\(.*?\)'
+    lyrics = re.sub(pattern2, '', re.sub(pattern, '', song.lyrics))
+    #print(lyrics)
+    #print(song_length)
 
+    parser=PlaintextParser.from_string(lyrics,Tokenizer('english'))
+    #  Creating the summarizer
+    luhn_summarizer=LuhnSummarizer()
+    luhn_summary=luhn_summarizer(parser.document,sentences_count=1)
+
+    search_line = str(luhn_summary[0]).split(',')[0]
+    stopwords = ['-', 'the', '&', '(']
+    #sp = spacy.load('en_core_web_sm')
+    #spacy_stopwords = sp.Defaults.stop_words
+    wordcount = {}
+    for word in lyrics.lower().split():
+        word = word.replace(".","")
+        word = word.replace(",","")
+        word = word.replace(":","")
+        word = word.replace("\"","")
+        word = word.replace("!","")
+        word = word.replace("â€œ","")
+        word = word.replace("â€˜","")
+        word = word.replace("*","")
+        if (word not in stopwords):# and (word not in spacy_stopwords):
+            if word not in wordcount:
+                wordcount[word] = 1
+            else:
+                wordcount[word] += 1
+    # Print most common word
+    n_print = 10
+    print("\nOK. The {} most common words are as follows\n".format(n_print))
+    word_counter = collections.Counter(wordcount)
+    words_list = []
+    for word, count in word_counter.most_common(n_print):
+        words_list.append(word)
+        print(word, ": ", count)
 
     # Adblock
     #hop = webdriver.ChromeOptions()
     #chop.add_extension('Adblock-Plus_v1.4.1.crx')
     # Create Browser
-    ''''
+    '''
     driver = webdriver.Chrome(ChromeDriverManager().install()) #, chrome_options=chop)
 
     driver.maximize_window()
@@ -60,7 +101,7 @@ def main():
     visible = EC.visibility_of_element_located
 
     # Navigate to url with video being appended to search_query
-    driver.get('https://www.youtube.com/results?search_query={}'.format(str(video)))
+    driver.get('https://www.youtube.com/results?search_query={}'.format(search_line))
     time.sleep(5)
     # Play the video.
     wait.until(visible((By.ID, "video-title")))
